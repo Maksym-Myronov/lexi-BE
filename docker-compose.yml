@@ -1,0 +1,30 @@
+# Local development services for Lexi.
+# Start:  pnpm db:up     Stop: pnpm db:down     Wipe & recreate: pnpm db:reset
+name: lexi
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: lexi-postgres
+    restart: unless-stopped
+    environment:
+      # Local-only credentials. Never reuse these in production.
+      POSTGRES_USER: lexi
+      POSTGRES_PASSWORD: lexi
+      POSTGRES_DB: lexi_dev # created automatically on first start
+    ports:
+      # host:container — 5433 on your PC, because a native PostgreSQL already uses 5432
+      - "5433:5432"
+    volumes:
+      # Named volume: data survives container restarts and re-creation
+      - lexi-pgdata:/var/lib/postgresql
+      # Scripts here run once, on the very first start (empty volume)
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lexi -d lexi_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  lexi-pgdata:
