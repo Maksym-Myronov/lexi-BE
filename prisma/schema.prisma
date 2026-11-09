@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,192 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum CardState {
+  NEW
+  LEARNING
+  REVIEW
+  RELEARNING
+  SUSPENDED
+}
+
+enum Rating {
+  AGAIN
+  HARD
+  GOOD
+  EASY
+}
+
+enum ExerciseType {
+  PICK_TRANSLATION
+  PICK_WORD
+  FLIP_CARD
+  LISTEN_AND_TYPE
+  TYPE_WORD
+  FILL_GAP
+  WRITE_SENTENCE
+}
+
+enum AiRequestKind {
+  LOOKUP
+  EXAMPLES
+  SENTENCE_CHECK
+}
+
+model User {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  email            String    @unique // stored lowercased by the app
+  passwordHash     String    @map("password_hash")
+  name             String
+  role             Role      @default(USER)
+  blocked          Boolean   @default(false)
+  nativeLanguage   String    @default("uk") @map("native_language")
+  timezone         String    @default("Europe/Bratislava")
+  dailyNewLimit    Int       @default(10) @map("daily_new_limit")
+  maxReviewsPerDay Int       @default(200) @map("max_reviews_per_day")
+  autoplayAudio    Boolean   @default(true) @map("autoplay_audio")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastActiveAt     DateTime? @map("last_active_at") @db.Timestamptz(3)
+
+  refreshTokens RefreshToken[]
+  decks         Deck[]
+  cards         Card[]
+  reviewLogs    ReviewLog[]
+  aiRequests    AiRequest[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// null = no limit
+model RoleLimit {
+  role                 Role @id
+  lookupsPerDay        Int? @map("lookups_per_day")
+  sentenceChecksPerDay Int? @map("sentence_checks_per_day")
+  maxNewCardsPerDay    Int? @map("max_new_cards_per_day")
+
+  @@map("role_limits")
+}
+
+// Shared AI lookup cache, not owned by any user
+model Word {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  lemma          String
+  forms          String[] @default([])
+  targetLanguage String   @map("target_language")
+  partOfSpeech   String   @map("part_of_speech")
+  ipa            String?
+  cefr           String?
+  data           Json     @db.JsonB
+  model          String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  cards Card[]
+
+  @@unique([lemma, targetLanguage])
+  @@index([forms], type: Gin)
+  @@map("words")
+}
+
+model Deck {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@unique([userId, name])
+  @@map("decks")
+}
+
+model Card {
+  id                 String     @id @default(uuid(7)) @db.Uuid
+  userId             String     @map("user_id") @db.Uuid
+  deckId             String     @map("deck_id") @db.Uuid
+  wordId             String     @map("word_id") @db.Uuid
+  meaningIndex       Int        @map("meaning_index")
+  customTranslation  String?    @map("custom_translation")
+  note               String?
+  contextSentence    String?    @map("context_sentence")
+  state              CardState  @default(NEW)
+  stateBeforeSuspend CardState? @map("state_before_suspend")
+  stepIndex          Int        @default(0) @map("step_index")
+  dueAt              DateTime   @default(now()) @map("due_at") @db.Timestamptz(3)
+  intervalDays       Float      @default(0) @map("interval_days")
+  ease               Float      @default(2.5)
+  reps               Int        @default(0)
+  lapses             Int        @default(0)
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deck       Deck        @relation(fields: [deckId], references: [id], onDelete: Restrict)
+  word       Word        @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  reviewLogs ReviewLog[]
+
+  @@unique([userId, wordId, meaningIndex])
+  @@index([userId, state, dueAt])
+  @@index([deckId])
+  @@map("cards")
+}
+
+model ReviewLog {
+  id             String       @id @db.Uuid // generated by the client for idempotent retries
+  cardId         String       @map("card_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  reviewedAt     DateTime     @default(now()) @map("reviewed_at") @db.Timestamptz(3)
+  rating         Rating
+  exerciseType   ExerciseType @map("exercise_type")
+  correct        Boolean
+  durationMs     Int          @map("duration_ms")
+  stateBefore    CardState    @map("state_before")
+  intervalBefore Float        @map("interval_before")
+  intervalAfter  Float        @map("interval_after")
+  easeAfter      Float        @map("ease_after")
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, reviewedAt])
+  @@index([cardId])
+  @@map("review_logs")
+}
+
+model AiRequest {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  userId       String        @map("user_id") @db.Uuid
+  kind         AiRequestKind
+  word         String
+  cacheHit     Boolean       @map("cache_hit")
+  inputTokens  Int           @default(0) @map("input_tokens")
+  outputTokens Int           @default(0) @map("output_tokens")
+  model        String?
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, createdAt])
+  @@map("ai_requests")
 }
