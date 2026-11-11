@@ -1,4 +1,10 @@
-import { Body, Controller, Module, Post, type INestApplication } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Module,
+  Post,
+  type INestApplication,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { IsInt, IsString, Min } from 'class-validator';
 import request from 'supertest';
@@ -77,7 +83,11 @@ describe('API foundation (e2e)', () => {
       .post('/__test/echo')
       .send({ name: 'reluctant', count: 2 })
       .expect(201);
-    expect(res.body).toEqual({ name: 'reluctant', count: 2, countType: 'number' });
+    expect(res.body).toEqual({
+      name: 'reluctant',
+      count: 2,
+      countType: 'number',
+    });
   });
 
   it('unknown field → 400 VALIDATION_ERROR', async () => {
@@ -110,7 +120,9 @@ describe('API foundation (e2e)', () => {
   });
 
   it('serves the Swagger docs outside production', async () => {
-    const res = await request(app.getHttpServer()).get('/docs-json').expect(200);
+    const res = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
     expect(res.body.paths).toHaveProperty('/health');
   });
 });

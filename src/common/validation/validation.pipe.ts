@@ -1,4 +1,8 @@
-import { HttpStatus, ValidationPipe, type ValidationError } from '@nestjs/common';
+import {
+  HttpStatus,
+  ValidationPipe,
+  type ValidationError,
+} from '@nestjs/common';
 import { AppException } from '../errors/app.exception.js';
 import { ErrorCode } from '../errors/error-codes.js';
 
@@ -8,7 +12,9 @@ export function flattenValidationErrors(
 ): Record<string, string[]> {
   const result: Record<string, string[]> = {};
   for (const error of errors) {
-    const path = parentPath ? `${parentPath}.${error.property}` : error.property;
+    const path = parentPath
+      ? `${parentPath}.${error.property}`
+      : error.property;
     if (error.constraints) {
       result[path] = Object.values(error.constraints);
     }
