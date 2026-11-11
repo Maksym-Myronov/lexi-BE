@@ -45,7 +45,9 @@ function requestId(req: IncomingMessage, res: ServerResponse): string {
               method: req.method,
               url: req.url,
             }),
-            res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
+            res: (res: { statusCode: number }) => ({
+              statusCode: res.statusCode,
+            }),
           },
           customLogLevel: (_req, res, err) =>
             err || res.statusCode >= 500

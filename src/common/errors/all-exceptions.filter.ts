@@ -26,7 +26,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (body.statusCode >= 500) {
       this.logger.error(exception);
     }
-    host.switchToHttp().getResponse<Response>().status(body.statusCode).json(body);
+    host
+      .switchToHttp()
+      .getResponse<Response>()
+      .status(body.statusCode)
+      .json(body);
   }
 }
 

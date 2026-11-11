@@ -11,7 +11,9 @@ import { ErrorCode } from './error-codes.js';
 describe('toErrorBody', () => {
   it('keeps the code, message and details of an AppException', () => {
     const body = toErrorBody(
-      new AppException(ErrorCode.CONFLICT, HttpStatus.CONFLICT, 'Taken', { field: 'email' }),
+      new AppException(ErrorCode.CONFLICT, HttpStatus.CONFLICT, 'Taken', {
+        field: 'email',
+      }),
     );
     expect(body).toEqual({
       statusCode: 409,
@@ -31,12 +33,17 @@ describe('toErrorBody', () => {
   it.each([
     [new NotFoundException('No such card'), 404, 'NOT_FOUND', 'No such card'],
     [new ForbiddenException(), 403, 'FORBIDDEN', 'Forbidden'],
-  ])('maps Nest HTTP exceptions to a stable code', (error, statusCode, code, message) => {
-    expect(toErrorBody(error)).toEqual({ statusCode, code, message });
-  });
+  ])(
+    'maps Nest HTTP exceptions to a stable code',
+    (error, statusCode, code, message) => {
+      expect(toErrorBody(error)).toEqual({ statusCode, code, message });
+    },
+  );
 
   it('hides the message of a 5xx HttpException', () => {
-    const body = toErrorBody(new InternalServerErrorException('db password is wrong'));
+    const body = toErrorBody(
+      new InternalServerErrorException('db password is wrong'),
+    );
     expect(body.message).toBe('Something went wrong');
   });
 
@@ -49,7 +56,9 @@ describe('toErrorBody', () => {
   });
 
   it('handles a malformed JSON body from Express', () => {
-    const parseError = Object.assign(new SyntaxError('Unexpected token'), { status: 400 });
+    const parseError = Object.assign(new SyntaxError('Unexpected token'), {
+      status: 400,
+    });
     expect(toErrorBody(parseError)).toEqual({
       statusCode: 400,
       code: 'BAD_REQUEST',
